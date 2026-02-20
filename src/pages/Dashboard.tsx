@@ -1,7 +1,31 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Thermometer, AlertCircle, CheckCircle } from 'lucide-react'
-import { supabase, type Project } from '../lib/supabase'
+import { supabase, isMockMode, type Project } from '../lib/supabase'
+
+// Mock data for testing
+const MOCK_PROJECTS: Project[] = [
+  {
+    id: '1',
+    title: 'F470 Installatie - Familie Jansen',
+    status: 'active',
+    priority: 'high',
+    heatpump_model: 'F470',
+    created_at: new Date().toISOString(),
+    customer: { id: '1', name: 'Familie Jansen', city: 'Rekken', created_at: '', updated_at: '' },
+    updated_at: new Date().toISOString()
+  },
+  {
+    id: '2',
+    title: 'Storing S2125 - Geen warm water',
+    status: 'active',
+    priority: 'urgent',
+    heatpump_model: 'S2125',
+    created_at: new Date().toISOString(),
+    customer: { id: '2', name: 'Dhr. van Dijk', city: 'Eibergen', created_at: '', updated_at: '' },
+    updated_at: new Date().toISOString()
+  }
+]
 
 export default function Dashboard() {
   const navigate = useNavigate()
@@ -15,6 +39,12 @@ export default function Dashboard() {
   }, [])
 
   async function checkConnection() {
+    // If in mock mode, skip connection check
+    if (isMockMode) {
+      setConnectionStatus('error')
+      return
+    }
+
     try {
       const { error } = await supabase.from('projects').select('count', { count: 'exact', head: true })
       if (error) throw error
@@ -26,6 +56,13 @@ export default function Dashboard() {
   }
 
   async function loadProjects() {
+    // If in mock mode, use mock data immediately
+    if (isMockMode) {
+      setProjects(MOCK_PROJECTS)
+      setLoading(false)
+      return
+    }
+
     try {
       const { data, error } = await supabase
         .from('projects')
@@ -37,29 +74,8 @@ export default function Dashboard() {
       setProjects(data || [])
     } catch (err) {
       console.error('Error loading projects:', err)
-      // Mock data for testing
-      setProjects([
-        {
-          id: '1',
-          title: 'F470 Installatie - Familie Jansen',
-          status: 'active',
-          priority: 'high',
-          heatpump_model: 'F470',
-          created_at: new Date().toISOString(),
-          customer: { id: '1', name: 'Familie Jansen', city: 'Rekken', created_at: '', updated_at: '' },
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          title: 'Storing S2125 - Geen warm water',
-          status: 'active',
-          priority: 'urgent',
-          heatpump_model: 'S2125',
-          created_at: new Date().toISOString(),
-          customer: { id: '2', name: 'Dhr. van Dijk', city: 'Eibergen', created_at: '', updated_at: '' },
-          updated_at: new Date().toISOString()
-        }
-      ])
+      // Fallback to mock data on error
+      setProjects(MOCK_PROJECTS)
     } finally {
       setLoading(false)
     }
@@ -78,7 +94,7 @@ export default function Dashboard() {
       {/* Connection Status */}
       <div className={`p-4 rounded-lg flex items-center gap-3 ${
         connectionStatus === 'connected' ? 'bg-green-50 text-green-700' :
-        connectionStatus === 'error' ? 'bg-red-50 text-red-700' :
+        connectionStatus === 'error' ? 'bg-amber-50 text-amber-700' :
         'bg-yellow-50 text-yellow-700'
       }`}>
         {connectionStatus === 'connected' ? <CheckCircle size={20} /> :
@@ -86,7 +102,7 @@ export default function Dashboard() {
          <div className="w-5 h-5 border-2 border-current border-t-transparent rounded-full animate-spin" />}
         <span>
           {connectionStatus === 'connected' ? 'Verbonden met Supabase!' :
-           connectionStatus === 'error' ? 'Verbindingsfout - Mock data actief' :
+           connectionStatus === 'error' ? (isMockMode ? 'Demo modus - Mock data actief' : 'Verbindingsfout - Mock data actief') :
            'Verbinding controleren...'}
         </span>
       </div>

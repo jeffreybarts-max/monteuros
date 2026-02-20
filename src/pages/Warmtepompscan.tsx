@@ -6,7 +6,7 @@ import {
   Save,
   ArrowLeft
 } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { supabase, isMockMode } from '../lib/supabase'
 
 const HEAT_PUMP_MODELS = [
   'F2120', 'F2040', 'F2050', 'F470', 'F370', 'F750',
@@ -69,6 +69,18 @@ export default function Warmtepompscan() {
     setIsSaving(true)
 
     try {
+      // In mock mode, just simulate success
+      if (isMockMode) {
+        console.log('Mock mode: Simulating scan save', formData)
+        await new Promise(resolve => setTimeout(resolve, 500))
+        setShowSuccess(true)
+        setTimeout(() => {
+          setShowSuccess(false)
+          navigate('/')
+        }, 2000)
+        return
+      }
+
       const { data: { user } } = await supabase.auth.getUser()
 
       const { error } = await supabase
@@ -102,9 +114,9 @@ export default function Warmtepompscan() {
         setShowSuccess(false)
         navigate('/')
       }, 2000)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving scan:', err)
-      alert('Fout bij opslaan: ' + (err as Error).message)
+      alert('Fout bij opslaan: ' + (err?.message || 'Onbekende fout'))
     } finally {
       setIsSaving(false)
     }
@@ -124,6 +136,16 @@ export default function Warmtepompscan() {
         </button>
         <h1 className="text-2xl font-bold text-gray-900">Warmtepompscan</h1>
       </div>
+
+      {/* Demo Mode Notice */}
+      {isMockMode && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center gap-3">
+          <AlertTriangle className="text-blue-500" size={20} />
+          <span className="text-blue-700">
+            Demo modus - Scans worden lokaal opgeslagen en niet naar de database verstuurd.
+          </span>
+        </div>
+      )}
 
       {/* Success Message */}
       {showSuccess && (

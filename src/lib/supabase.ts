@@ -3,7 +3,41 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || ''
 const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || ''
 
-export const supabase = createClient(supabaseUrl, supabaseKey)
+// Check if Supabase is properly configured
+const isSupabaseConfigured = supabaseUrl && supabaseKey && 
+  supabaseUrl !== 'your-project-url' && 
+  supabaseKey !== 'your-anon-key'
+
+// Create a mock client for demo mode when Supabase is not configured
+const createMockClient = () => {
+  return {
+    auth: {
+      getSession: async () => ({ data: { session: null }, error: null }),
+      getUser: async () => ({ data: { user: null }, error: null }),
+      onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+      signInWithPassword: async () => ({ data: { session: null }, error: new Error('Not configured') }),
+      signOut: async () => ({ error: null }),
+    },
+    from: (_table: string) => ({
+      select: () => ({
+        order: () => ({
+          limit: () => ({ data: [], error: new Error('Supabase not configured') })
+        }),
+        eq: () => ({ data: [], error: null }),
+        single: () => ({ data: null, error: new Error('Supabase not configured') }),
+      }),
+      insert: () => ({ error: new Error('Supabase not configured') }),
+      update: () => ({ eq: () => ({ error: new Error('Supabase not configured') }) }),
+      delete: () => ({ eq: () => ({ error: new Error('Supabase not configured') }) }),
+    }),
+  } as any
+}
+
+export const supabase = isSupabaseConfigured 
+  ? createClient(supabaseUrl, supabaseKey)
+  : createMockClient()
+
+export const isMockMode = !isSupabaseConfigured
 
 export type Profile = {
   id: string

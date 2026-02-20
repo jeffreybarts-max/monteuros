@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
-import { supabase } from './lib/supabase'
+import { supabase, isMockMode } from './lib/supabase'
 import Dashboard from './pages/Dashboard'
 import Warmtepompscan from './pages/Warmtepompscan'
 import Layout from './components/Layout'
@@ -27,27 +27,48 @@ function App() {
     // Check for stored mock session first
     const storedMockSession = localStorage.getItem('monteuros_mock_session')
     if (storedMockSession) {
-      setSession(JSON.parse(storedMockSession))
-      setLoading(false)
-      return
+      try {
+        setSession(JSON.parse(storedMockSession))
+        setLoading(false)
+        return
+      } catch (e) {
+        localStorage.removeItem('monteuros_mock_session')
+      }
     }
 
     // Try Supabase session (if configured)
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (error) {
-        console.log('Supabase not configured, using test mode only')
+    const checkSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        if (error) {
+          console.log('Supabase session check:', error.message)
+        }
+        setSession(session)
+      } catch (err) {
+        console.log('Supabase not available, using test mode only')
+      } finally {
+        setLoading(false)
       }
-      setSession(session)
-      setLoading(false)
-    })
+    }
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-    })
+    checkSession()
 
-    return () => subscription.unsubscribe()
+    // Subscribe to auth changes
+    let subscription: { unsubscribe: () => void } | null = null
+    try {
+      const { data } = supabase.auth.onAuthStateChange((_event: string, session: any) => {
+        setSession(session)
+      })
+      subscription = data.subscription
+    } catch (err) {
+      console.log('Auth state change not available')
+    }
+
+    return () => {
+      if (subscription) {
+        subscription.unsubscribe()
+      }
+    }
   }, [])
 
   const handleTestLogin = async () => {
@@ -66,9 +87,9 @@ function App() {
         localStorage.setItem('monteuros_mock_session', JSON.stringify(mockSession))
         setSession(mockSession)
       }
-    } catch (err) {
+    } catch (err: any) {
       // If Supabase fails (e.g., not configured), use mock session
-      console.log('Supabase error, using mock session:', err)
+      console.log('Supabase error, using mock session:', err?.message || err)
       const mockSession = createMockSession()
       localStorage.setItem('monteuros_mock_session', JSON.stringify(mockSession))
       setSession(mockSession)
@@ -91,6 +112,11 @@ function App() {
           <p className="text-gray-600 mb-6 text-center">
             Test modus - Geen login nodig
           </p>
+          {isMockMode && (
+            <div className="mb-4 p-3 bg-blue-50 text-blue-700 rounded-lg text-sm">
+              ℹ️ Supabase is niet geconfigureerd. Demo modus actief.
+            </div>
+          )}
           {error && (
             <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg text-sm">
               {error}
